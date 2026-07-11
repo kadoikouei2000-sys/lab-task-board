@@ -9,6 +9,7 @@
 //     そのまま置いて問題ありません。
 // =============================================================
 window.APP_CONFIG = {
-  SUPABASE_URL: "https://YOUR-PROJECT-ref.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-ANON-PUBLIC-KEY"
+  SUPABASE_URL: "https://afhjhccgvfapwyrkaogf.supabase.co/rest/v1/",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmaGpoY2NndmZhcHd5cmthb2dmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NDU0NzgsImV4cCI6MjA5OTMyMTQ3OH0.4oJGX0bPtA4XV6xyKTQYoHxf8VbnTbUzemn7xH52joU
+"
 };
