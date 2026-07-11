@@ -115,6 +115,25 @@
     .act.done-btn.active { background: var(--ok); color: #fff; }
     .act.prio-btn { border-color: var(--star); color: #9a7500; }
     .act.prio-btn.active { background: var(--star); color: #fff; }
+    .act.del-btn { flex: none; padding: 0 14px; border-color: #e0b4ad; color: #a3341f; background: #fff; }
+
+    /* ---- 期限の日付ブロック ---- */
+    .card-row { display: flex; gap: 12px; align-items: stretch; }
+    .date-block {
+      flex: none; width: 64px; min-height: 64px;
+      border: 1px solid #d9deea; border-radius: 12px;
+      background: #eef1f7; color: var(--brand-dk);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 8px 4px; text-align: center;
+    }
+    .date-block .d-month { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
+    .date-block .d-day { font-size: 22px; font-weight: 800; line-height: 1.15; }
+    .date-block .d-over { font-size: 10px; font-weight: 700; margin-top: 3px; line-height: 1.2; }
+    .date-block.ovd1 { background: var(--ovd1); border-color: #e3c96a; color: #7a5c00; }
+    .date-block.ovd2 { background: var(--ovd2); border-color: #eaa858; color: #8a4b00; }
+    .date-block.ovd3 { background: var(--ovd3); border-color: #dd8d8d; color: #8a2318; }
+    .date-block.dgray { background: #eceff3; border-color: var(--line); color: var(--ink-soft); }
+    .card-main { flex: 1; min-width: 0; }
 
     .empty { text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 15px; }
     .loading { text-align: center; color: var(--ink-soft); padding: 40px 10px; }
@@ -368,6 +387,13 @@
       if (error) onError(error);
       await loadTasks();
     }
+    async function doDelete(id, title) {
+      if (!window.confirm('「' + title + '」を削除しますか?\nこの操作は元に戻せません。')) return;
+      const { error } = await sb.rpc('delete_task', { p_task_id: id });
+      if (error) { onError(error); }
+      else { showToast('タスクを削除しました'); }
+      await loadTasks();
+    }
 
     /* ========== 描画 ========== */
     function renderMe() {
@@ -448,6 +474,36 @@
         else card.classList.add('ovd1');
       }
 
+      const row = document.createElement('div'); row.className = 'card-row';
+
+      // ---- 期限の日付ブロック(左側) ----
+      const db = document.createElement('div'); db.className = 'date-block';
+      if (t.is_done) db.classList.add('dgray');
+      else if (ovd >= 8) db.classList.add('ovd3');
+      else if (ovd >= 4) db.classList.add('ovd2');
+      else if (ovd >= 1) db.classList.add('ovd1');
+
+      const parts = String(t.deadline || '').split('-'); // yyyy-mm-dd
+      const dMonth = document.createElement('div'); dMonth.className = 'd-month';
+      const dDay = document.createElement('div'); dDay.className = 'd-day';
+      if (parts.length === 3) {
+        dMonth.textContent = Number(parts[1]) + '月';
+        dDay.textContent = String(Number(parts[2]));
+      } else {
+        dMonth.textContent = '期限';
+        dDay.textContent = '−';
+      }
+      db.appendChild(dMonth); db.appendChild(dDay);
+      if (!t.is_done && ovd > 0) {
+        const dOver = document.createElement('div'); dOver.className = 'd-over';
+        dOver.textContent = ovd + '日超過';
+        db.appendChild(dOver);
+      }
+      row.appendChild(db);
+
+      // ---- 本文(右側) ----
+      const main = document.createElement('div'); main.className = 'card-main';
+
       const top = document.createElement('div'); top.className = 'card-top';
       if (t.is_priority && !t.is_done) {
         const star = document.createElement('span'); star.className = 'star'; star.textContent = '★'; top.appendChild(star);
@@ -455,27 +511,20 @@
       const title = document.createElement('div');
       title.className = 'title' + (t.is_done ? ' done-line' : '');
       title.textContent = t.title;
-      top.appendChild(title); card.appendChild(top);
+      top.appendChild(title); main.appendChild(top);
 
       const tags = document.createElement('div'); tags.className = 'tags';
       const gTag = document.createElement('span'); gTag.className = 'tag'; gTag.textContent = t.group_name || '(班未設定)'; tags.appendChild(gTag);
       if (t.is_private) { const lock = document.createElement('span'); lock.className = 'tag lock'; lock.textContent = '🔒 プライバシー'; tags.appendChild(lock); }
-      card.appendChild(tags);
+      main.appendChild(tags);
 
-      const meta = document.createElement('div'); meta.className = 'meta';
-      const dl = document.createElement('span'); dl.textContent = '期限 ' + (t.deadline || '未設定'); meta.appendChild(dl);
-      if (!t.is_done && ovd > 0) {
-        const ov = document.createElement('span');
-        ov.className = 'ovd-flag' + (ovd >= 8 ? ' strong' : '');
-        ov.textContent = ovd + '日超過';
-        meta.appendChild(ov);
-      }
       if (t.is_done) {
+        const meta = document.createElement('div'); meta.className = 'meta';
         const dn = document.createElement('span');
         dn.textContent = '完了' + (t.done_by ? '(' + t.done_by + ')' : '');
         meta.appendChild(dn);
+        main.appendChild(meta);
       }
-      card.appendChild(meta);
 
       if (t.can_operate) {
         const actions = document.createElement('div'); actions.className = 'actions';
@@ -493,8 +542,17 @@
           prioBtn.addEventListener('click', () => doPriority(t.id));
           actions.appendChild(prioBtn);
         }
-        card.appendChild(actions);
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'act del-btn';
+        delBtn.textContent = '削除';
+        delBtn.addEventListener('click', () => doDelete(t.id, t.title));
+        actions.appendChild(delBtn);
+        main.appendChild(actions);
       }
+
+      row.appendChild(main);
+      card.appendChild(row);
       return card;
     }
 
