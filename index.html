@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>研究室タスク掲示板</title>
+  <style>
+    :root {
+      --ink:      #1c2230;
+      --ink-soft: #55607a;
+      --line:     #dfe3ec;
+      --bg:       #f2f4f8;
+      --card:     #ffffff;
+      --brand:    #2f4b7c;
+      --brand-dk: #22375c;
+      --star:     #d9a400;
+      --ok:       #2e7d54;
+      --ovd1: #fff3cd;
+      --ovd2: #ffe0b2;
+      --ovd3: #ffcdd2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+                   "Noto Sans JP", Meiryo, sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 0 14px 64px; }
+    .hidden { display: none !important; }
+
+    /* ---- ヘッダ ---- */
+    header.app {
+      position: sticky; top: 0; z-index: 5;
+      background: var(--brand); color: #fff;
+      margin: 0 -14px 14px; padding: 14px 16px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.08);
+    }
+    header.app .h-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    header.app h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+    .me { margin-top: 6px; font-size: 13px; color: #d7e0f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .me .badge { background: rgba(255,255,255,.16); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+    .btn-logout {
+      flex: none; min-height: 38px; padding: 0 12px; font-size: 13px;
+      background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.28);
+      border-radius: 9px; cursor: pointer;
+    }
+
+    /* ---- 操作バー ---- */
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+    .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-soft); cursor: pointer; min-height: 44px; }
+    .toggle input { width: 20px; height: 20px; }
+    .btn-refresh {
+      min-height: 44px; padding: 0 14px; font-size: 14px;
+      border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
+      border-radius: 10px; cursor: pointer;
+    }
+
+    /* ---- 追加フォーム ---- */
+    details.add { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 16px; overflow: hidden; }
+    details.add > summary { list-style: none; cursor: pointer; padding: 14px 16px; font-weight: 700; color: var(--brand-dk); min-height: 44px; display: flex; align-items: center; gap: 8px; }
+    details.add > summary::-webkit-details-marker { display: none; }
+    details.add > summary::before { content: "＋"; font-size: 18px; color: var(--brand); }
+    details.add[open] > summary::before { content: "－"; }
+    .form-body { padding: 4px 16px 18px; border-top: 1px solid var(--line); }
+    .field { margin-top: 12px; }
+    .field label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+    .field input[type=text], .field input[type=email], .field input[type=password],
+    .field input[type=date], .field select {
+      width: 100%; min-height: 46px; font-size: 16px; padding: 0 12px;
+      border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
+    }
+    .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; }
+    .check input { width: 20px; height: 20px; }
+    .hint { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+    .btn-primary {
+      margin-top: 16px; width: 100%; min-height: 50px; font-size: 16px; font-weight: 700;
+      color: #fff; background: var(--brand); border: none; border-radius: 12px; cursor: pointer;
+    }
+    .btn-primary:disabled { opacity: .55; cursor: default; }
+
+    /* ---- 班セクション ---- */
+    .group-sec { margin-bottom: 22px; }
+    .group-head {
+      display: flex; align-items: baseline; gap: 8px;
+      font-size: 13px; font-weight: 700; color: var(--brand-dk); letter-spacing: .03em;
+      padding: 0 2px 8px; border-bottom: 2px solid var(--line); margin-bottom: 10px;
+    }
+    .group-head .count { font-weight: 500; color: var(--ink-soft); font-size: 12px; }
+
+    /* ---- タスクカード ---- */
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(20,30,60,.04); }
+    .card.priority { border-color: var(--star); box-shadow: 0 0 0 1px var(--star) inset, 0 1px 2px rgba(20,30,60,.04); }
+    .card.done { opacity: .62; }
+    .card.ovd1 { background: var(--ovd1); }
+    .card.ovd2 { background: var(--ovd2); }
+    .card.ovd3 { background: var(--ovd3); }
+    .card-top { display: flex; align-items: flex-start; gap: 8px; }
+    .star { font-size: 18px; line-height: 1.4; color: var(--star); flex: none; }
+    .title { font-size: 16px; font-weight: 600; word-break: break-word; flex: 1; }
+    .title.done-line { text-decoration: line-through; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #eef1f7; color: var(--brand-dk); border: 1px solid #e2e7f0; }
+    .tag.lock { background: #efeaf7; color: #5b3fa0; border-color: #e4dcf3; }
+    .meta { margin-top: 8px; font-size: 13px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .ovd-flag { font-weight: 600; color: #a3341f; }
+    .ovd-flag.strong { font-weight: 800; }
+    .actions { display: flex; gap: 8px; margin-top: 12px; }
+    .act { flex: 1; min-height: 44px; font-size: 14px; font-weight: 600; border-radius: 10px; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    .act.done-btn { border-color: var(--ok); color: var(--ok); }
+    .act.done-btn.active { background: var(--ok); color: #fff; }
+    .act.prio-btn { border-color: var(--star); color: #9a7500; }
+    .act.prio-btn.active { background: var(--star); color: #fff; }
+
+    .empty { text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 15px; }
+    .loading { text-align: center; color: var(--ink-soft); padding: 40px 10px; }
+
+    /* ---- 認証 / 未登録カード ---- */
+    .center-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; width: 100%; max-width: 420px; padding: 26px 22px; box-shadow: 0 2px 8px rgba(20,30,60,.06); }
+    .panel h1 { font-size: 19px; margin: 0 0 4px; color: var(--brand-dk); text-align: center; }
+    .panel .sub { text-align: center; color: var(--ink-soft); font-size: 13px; margin-bottom: 8px; }
+    .tabs { display: flex; gap: 6px; margin: 14px 0 4px; }
+    .tab { flex: 1; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+    .notice.info { background: #e8f0fb; color: #244b82; }
+    .notice.warn { background: #fdecea; color: #8a2318; }
+    .email-chip { display: inline-block; margin-top: 8px; padding: 8px 14px; background: #eef1f7; border-radius: 10px; font-size: 14px; word-break: break-all; }
+
+    /* ---- トースト ---- */
+    #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; max-width: 88%; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 20; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.err { background: #8a2318; }
+    @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+  </style>
+</head>
+<body>
+  <!-- 起動中 -->
+  <div id="boot" class="center-screen"><div class="loading">読み込み中…</div></div>
+
+  <!-- (1) 未ログイン: 認証 -->
+  <div id="view-auth" class="center-screen hidden">
+    <div class="panel">
+      <h1>研究室タスク掲示板</h1>
+      <div class="sub">大学メールアドレスでログインしてください</div>
+      <div class="tabs">
+        <button class="tab active" id="tab-login" type="button">ログイン</button>
+        <button class="tab" id="tab-signup" type="button">新規登録</button>
+      </div>
+      <div class="field">
+        <label for="a-email">メールアドレス</label>
+        <input type="email" id="a-email" autocomplete="username" placeholder="例: s000000@ruri.waseda.jp">
+      </div>
+      <div class="field">
+        <label for="a-pass">パスワード</label>
+        <input type="password" id="a-pass" autocomplete="current-password" placeholder="6文字以上">
+      </div>
+      <button class="btn-primary" id="a-submit" type="button">ログイン</button>
+      <div id="a-notice" class="notice info hidden"></div>
+    </div>
+  </div>
+
+  <!-- (2) ログイン済み・非メンバー -->
+  <div id="view-unauth" class="center-screen hidden">
+    <div class="panel" style="text-align:center;">
+      <div style="font-size:40px;">🔒</div>
+      <h1>アクセス権がありません</h1>
+      <div class="sub">このアカウントはメンバーとして登録されていません。管理者(先生または担当者)に登録を依頼してください。</div>
+      <div class="email-chip" id="u-email"></div>
+      <div style="margin-top:16px;"><button class="btn-logout" id="u-logout" type="button">ログアウト</button></div>
+    </div>
+  </div>
+
+  <!-- (3) メンバー: 掲示板本体 -->
+  <div id="view-app" class="hidden">
+    <header class="app">
+      <div class="h-row">
+        <h1>研究室タスク掲示板</h1>
+        <button class="btn-logout" id="logout" type="button">ログアウト</button>
+      </div>
+      <div class="me" id="me"></div>
+    </header>
+    <div class="wrap">
+      <div class="bar">
+        <label class="toggle"><input type="checkbox" id="showDone"><span>完了済みを表示</span></label>
+        <button class="btn-refresh" id="refresh" type="button">更新</button>
+      </div>
+
+      <details class="add" id="addBox">
+        <summary>タスクを追加</summary>
+        <div class="form-body">
+          <div class="field">
+            <label for="f-title">タスク名</label>
+            <input type="text" id="f-title" maxlength="200" placeholder="例: 中間報告のスライドを提出">
+          </div>
+          <div class="field">
+            <label for="f-deadline">期限</label>
+            <input type="date" id="f-deadline">
+          </div>
+          <div class="field" id="groupField" style="display:none;">
+            <label for="f-group">研究班</label>
+            <select id="f-group"></select>
+          </div>
+          <div class="field">
+            <label class="check"><input type="checkbox" id="f-private"><span>プライバシー(自分と先生だけに表示)</span></label>
+            <div class="hint">チェックすると、このタスクはあなたと先生以外には表示されません。</div>
+          </div>
+          <button class="btn-primary" id="submit" type="button">追加する</button>
+        </div>
+      </details>
+
+      <div id="list"><div class="loading">読み込み中…</div></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="config.js"></script>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const cfg = window.APP_CONFIG || {};
+    const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+    let STATE = { me: null, groups: [], tasks: [] };
+    let authMode = 'login'; // 'login' | 'signup'
+
+    /* ========== 画面切り替え ========== */
+    function show(view) {
+      ['boot','view-auth','view-unauth','view-app'].forEach(id => {
+        document.getElementById(id).classList.toggle('hidden', id !== view);
+      });
+    }
+
+    /* ========== 起動・セッション監視 ========== */
+    async function refreshSession() {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) { show('view-auth'); return; }
+      const { data: meData, error } = await sb.rpc('me');
+      if (error) { showToast(error.message || '情報取得に失敗しました', true); show('view-auth'); return; }
+      if (!meData || meData.registered === false) {
+        document.getElementById('u-email').textContent = (meData && meData.email) || '';
+        show('view-unauth');
+        return;
+      }
+      STATE.me = meData;
+      renderMe();
+      show('view-app');
+      await loadGroups();
+      await loadTasks();
+    }
+
+    sb.auth.onAuthStateChange((_event, _session) => { refreshSession(); });
+
+    /* ========== 認証UI ========== */
+    function setAuthMode(mode) {
+      authMode = mode;
+      document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+      document.getElementById('a-submit').textContent = (mode === 'login') ? 'ログイン' : '新規登録';
+      document.getElementById('a-pass').setAttribute('autocomplete', mode === 'login' ? 'current-password' : 'new-password');
+      hideAuthNotice();
+    }
+    function showAuthNotice(msg, kind) {
+      const el = document.getElementById('a-notice');
+      el.textContent = msg;
+      el.className = 'notice ' + (kind || 'info');
+    }
+    function hideAuthNotice() { document.getElementById('a-notice').classList.add('hidden'); }
+
+    async function submitAuth() {
+      const email = document.getElementById('a-email').value.trim().toLowerCase();
+      const pass  = document.getElementById('a-pass').value;
+      if (!email) { showAuthNotice('メールアドレスを入力してください', 'warn'); return; }
+      if (!pass)  { showAuthNotice('パスワードを入力してください', 'warn'); return; }
+
+      const btn = document.getElementById('a-submit');
+      btn.disabled = true;
+      try {
+        if (authMode === 'signup') {
+          const { error } = await sb.auth.signUp({ email, password: pass });
+          if (error) throw error;
+          showAuthNotice('確認メールを送信しました。メール内のリンクを開いて登録を完了し、その後ログインしてください。', 'info');
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+          if (error) {
+            if (/confirm/i.test(error.message)) {
+              showAuthNotice('メール確認が未完了です。確認メールのリンクを開いてからログインしてください。', 'warn');
+            } else {
+              showAuthNotice(error.message || 'ログインに失敗しました', 'warn');
+            }
+            return;
+          }
+          // 成功時は onAuthStateChange が画面を切り替える
+        }
+      } catch (e) {
+        showAuthNotice((e && e.message) ? e.message : 'エラーが発生しました', 'warn');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function doLogout() { await sb.auth.signOut(); show('view-auth'); }
+
+    /* ========== データ取得 ========== */
+    async function loadGroups() {
+      const { data, error } = await sb.rpc('list_groups');
+      if (error) { STATE.groups = []; }
+      else {
+        STATE.groups = (data || [])
+          .map(r => (typeof r === 'string' ? r : (r.name ?? r.list_groups ?? Object.values(r)[0])))
+          .filter(Boolean);
+      }
+      renderGroupOptions();
+    }
+
+    async function loadTasks() {
+      setListMessage('読み込み中…', 'loading');
+      const { data, error } = await sb.from('task_list').select('*');
+      if (error) { onError(error); return; }
+      STATE.tasks = data || [];
+      render();
+    }
+
+    function onError(err) {
+      showToast((err && err.message) ? err.message : '通信に失敗しました', true);
+      setListMessage('読み込みに失敗しました。「更新」を押してください。', 'empty');
+    }
+
+    /* ========== 変更操作 ========== */
+    async function submitTask() {
+      const title = document.getElementById('f-title').value.trim();
+      const deadline = document.getElementById('f-deadline').value;
+      const isPrivate = document.getElementById('f-private').checked;
+      let group = '';
+      if (STATE.me && STATE.me.isTeacher) group = document.getElementById('f-group').value;
+      if (title === '') { showToast('タスク名を入力してください', true); return; }
+      if (!deadline)    { showToast('期限を入力してください', true); return; }
+
+      const btn = document.getElementById('submit');
+      btn.disabled = true; btn.textContent = '追加中…';
+      const { error } = await sb.rpc('add_task', {
+        p_title: title, p_group: group, p_deadline: deadline, p_is_private: isPrivate
+      });
+      btn.disabled = false; btn.textContent = '追加する';
+      if (error) { onError(error); return; }
+      document.getElementById('f-title').value = '';
+      document.getElementById('f-deadline').value = '';
+      document.getElementById('f-private').checked = false;
+      document.getElementById('addBox').open = false;
+      showToast('タスクを追加しました');
+      await loadGroups();
+      await loadTasks();
+    }
+
+    async function doToggle(id) {
+      const { error } = await sb.rpc('toggle_done', { p_task_id: id });
+      if (error) onError(error);
+      await loadTasks();
+    }
+    async function doPriority(id) {
+      const { error } = await sb.rpc('set_priority', { p_task_id: id });
+      if (error) onError(error);
+      await loadTasks();
+    }
+
+    /* ========== 描画 ========== */
+    function renderMe() {
+      const me = STATE.me;
+      const box = document.getElementById('me');
+      box.textContent = '';
+      const email = document.createElement('span');
+      email.textContent = me.email;
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = me.isTeacher ? '教員' : (me.group || '班未所属');
+      box.appendChild(email); box.appendChild(badge);
+    }
+
+    function renderGroupOptions() {
+      if (!STATE.me || !STATE.me.isTeacher) { document.getElementById('groupField').style.display = 'none'; return; }
+      document.getElementById('groupField').style.display = 'block';
+      const sel = document.getElementById('f-group');
+      sel.textContent = '';
+      STATE.groups.forEach(g => {
+        const o = document.createElement('option');
+        o.value = g; o.textContent = g; sel.appendChild(o);
+      });
+    }
+
+    function render() {
+      const showDone = document.getElementById('showDone').checked;
+      const list = document.getElementById('list');
+      list.textContent = '';
+
+      let tasks = STATE.tasks.slice();
+      if (!showDone) tasks = tasks.filter(t => !t.is_done);
+      if (tasks.length === 0) {
+        setListMessage(showDone ? 'タスクはありません。' : '未完了のタスクはありません。', 'empty');
+        return;
+      }
+
+      const byGroup = {}; const order = [];
+      tasks.forEach(t => {
+        const g = t.group_name || '';
+        if (!byGroup[g]) { byGroup[g] = []; order.push(g); }
+        byGroup[g].push(t);
+      });
+      order.sort();
+
+      order.forEach(g => {
+        const arr = byGroup[g].slice().sort(sortTasks);
+        const sec = document.createElement('div'); sec.className = 'group-sec';
+        const head = document.createElement('div'); head.className = 'group-head';
+        const gname = document.createElement('span'); gname.textContent = g || '(班未設定)';
+        const cnt = document.createElement('span'); cnt.className = 'count';
+        cnt.textContent = arr.filter(t => !t.is_done).length + ' 件';
+        head.appendChild(gname); head.appendChild(cnt); sec.appendChild(head);
+        arr.forEach(t => sec.appendChild(renderCard(t)));
+        list.appendChild(sec);
+      });
+    }
+
+    function sortTasks(a, b) {
+      if (a.is_done !== b.is_done) return a.is_done ? 1 : -1;
+      if (!a.is_done && a.is_priority !== b.is_priority) return a.is_priority ? -1 : 1;
+      return cmpDeadline(a.deadline, b.deadline);
+    }
+    function cmpDeadline(x, y) {
+      if (!x && !y) return 0; if (!x) return 1; if (!y) return -1;
+      return x < y ? -1 : (x > y ? 1 : 0);
+    }
+
+    function renderCard(t) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      if (t.is_priority && !t.is_done) card.classList.add('priority');
+      if (t.is_done) card.classList.add('done');
+      const ovd = Number(t.overdue_days) || 0;
+      if (!t.is_done && ovd > 0) {
+        if (ovd >= 8) card.classList.add('ovd3');
+        else if (ovd >= 4) card.classList.add('ovd2');
+        else card.classList.add('ovd1');
+      }
+
+      const top = document.createElement('div'); top.className = 'card-top';
+      if (t.is_priority && !t.is_done) {
+        const star = document.createElement('span'); star.className = 'star'; star.textContent = '★'; top.appendChild(star);
+      }
+      const title = document.createElement('div');
+      title.className = 'title' + (t.is_done ? ' done-line' : '');
+      title.textContent = t.title;
+      top.appendChild(title); card.appendChild(top);
+
+      const tags = document.createElement('div'); tags.className = 'tags';
+      const gTag = document.createElement('span'); gTag.className = 'tag'; gTag.textContent = t.group_name || '(班未設定)'; tags.appendChild(gTag);
+      if (t.is_private) { const lock = document.createElement('span'); lock.className = 'tag lock'; lock.textContent = '🔒 プライバシー'; tags.appendChild(lock); }
+      card.appendChild(tags);
+
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const dl = document.createElement('span'); dl.textContent = '期限 ' + (t.deadline || '未設定'); meta.appendChild(dl);
+      if (!t.is_done && ovd > 0) {
+        const ov = document.createElement('span');
+        ov.className = 'ovd-flag' + (ovd >= 8 ? ' strong' : '');
+        ov.textContent = ovd + '日超過';
+        meta.appendChild(ov);
+      }
+      if (t.is_done) {
+        const dn = document.createElement('span');
+        dn.textContent = '完了' + (t.done_by ? '(' + t.done_by + ')' : '');
+        meta.appendChild(dn);
+      }
+      card.appendChild(meta);
+
+      if (t.can_operate) {
+        const actions = document.createElement('div'); actions.className = 'actions';
+        const doneBtn = document.createElement('button');
+        doneBtn.type = 'button';
+        doneBtn.className = 'act done-btn' + (t.is_done ? ' active' : '');
+        doneBtn.textContent = t.is_done ? '完了を取消' : '完了にする';
+        doneBtn.addEventListener('click', () => doToggle(t.id));
+        actions.appendChild(doneBtn);
+        if (!t.is_done) {
+          const prioBtn = document.createElement('button');
+          prioBtn.type = 'button';
+          prioBtn.className = 'act prio-btn' + (t.is_priority ? ' active' : '');
+          prioBtn.textContent = t.is_priority ? '最優先を解除' : '最優先にする';
+          prioBtn.addEventListener('click', () => doPriority(t.id));
+          actions.appendChild(prioBtn);
+        }
+        card.appendChild(actions);
+      }
+      return card;
+    }
+
+    /* ========== 補助 ========== */
+    function setListMessage(msg, cls) {
+      const list = document.getElementById('list');
+      list.textContent = '';
+      const d = document.createElement('div'); d.className = cls; d.textContent = msg; list.appendChild(d);
+    }
+    let toastTimer = null;
+    function showToast(msg, isErr) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'show' + (isErr ? ' err' : '');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+    }
+
+    /* ========== イベント登録・起動 ========== */
+    document.getElementById('tab-login').addEventListener('click', () => setAuthMode('login'));
+    document.getElementById('tab-signup').addEventListener('click', () => setAuthMode('signup'));
+    document.getElementById('a-submit').addEventListener('click', submitAuth);
+    document.getElementById('a-pass').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+    document.getElementById('u-logout').addEventListener('click', doLogout);
+    document.getElementById('logout').addEventListener('click', doLogout);
+    document.getElementById('showDone').addEventListener('change', render);
+    document.getElementById('refresh').addEventListener('click', loadTasks);
+    document.getElementById('submit').addEventListener('click', submitTask);
+
+    if (!cfg.SUPABASE_URL || cfg.SUPABASE_URL.indexOf('YOUR-PROJECT') !== -1) {
+      show('view-auth');
+      showAuthNotice('config.js に Supabase の URL と anon key を設定してください。', 'warn');
+    } else {
+      refreshSession();
+    }
+  </script>
+</body>
+</html>
